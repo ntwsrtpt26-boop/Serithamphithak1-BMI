@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="th" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OcuScan AI Pro - ระบบตรวจหาพยาธิดวงตา</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { 
+      font-family: 'Prompt', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1a1f35 100%);
+    }
+
+    @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slide-in { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes pulse-glow { 0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); } 50% { box-shadow: 0 0 40px rgba(59, 130, 246, 0.6); } }
+    @keyframes scan-line { 0% { transform: translateY(-100%); } 100% { transform: translateY(100%); } }
+    @keyframes bounce-subtle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+    .animate-fade-in { animation: fade-in 0.5s ease-out forwards; }
+    .animate-slide-in { animation: slide-in 0.5s ease-out forwards; }
+    .pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
+    .scan-animation { animation: scan-line 2s linear infinite; }
+    .animate-bounce-subtle { animation: bounce-subtle 1s ease-in-out infinite; }
+
+    .glass-card {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(71, 85, 105, 0.5);
+    }
+
+    .nav-active { 
+      border-b-2 border-blue-500;
+      color: #3b82f6;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #334155;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      border: 2px solid #1e293b;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      border: 2px solid #1e293b;
+    }
+
+    .progress-bar {
+      background: linear-gradient(90deg, #3b82f6, #06b6d4);
+      transition: width 0.3s ease;
+    }
+
+    .tab-button {
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .tab-button::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: #3b82f6;
+      transform: scaleX(0);
+      transition: transform 0.3s ease;
+    }
+
+    .tab-button.active::after {
+      transform: scaleX(1);
+    }
+
+    .stat-card {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(6, 182, 212, 0.1));
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .severity-high { color: #ef4444; }
+    .severity-medium { color: #f59e0b; }
+    .severity-low { color: #10b981; }
+
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+    }
+
+    .checkbox-custom {
+      width: 20px;
+      height: 20px;
+      border: 2px solid #475569;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .checkbox-custom:checked {
+      background: #3b82f6;
+      border-color: #3b82f6;
+    }
+
+    #app-wrapper {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #main-content {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="w-full h-full text-slate-100">
+  <div id="app-wrapper" class="w-full h-full flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900"><!-- Header -->
+   <header id="header" class="glass-card sticky top-0 z-50 shadow-xl border-b border-slate-700">
+    <div class="max-w-2xl mx-auto px-4 py-3">
+     <div class="flex items-center justify-between">
+      <div class="flex items-center gap-2">
+       <div class="bg-gradient-to-br from-blue-600 to-cyan-600 p-2 rounded-lg shadow-lg shadow-blue-600/30">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewbox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+         <path d="M3 7V5a2 2 0 0 1 2-2h2" /><path d="M17 3h2a2 2 0 0 1 2 2v2" /><path d="M21 17v2a2 2 0 0 1-2 2h-2" /><path d="M7 21H5a2 2 0 0 1-2-2v-2" /><circle cx="12" cy="12" r="3" /><path d="M12 12 12 12.01" />
+        </svg>
+       </div>
+       <div>
+        <h1 id="app-title" class="font-bold text-lg tracking-tight">OcuScan <span class="text-cyan-400">AI</span> Pro</h1>
+        <p id="app-subtitle" class="text-xs text-slate-400">Medical Detection System</p>
+       </div>
+      </div>
+      <div id="notification-badge" class="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium hidden"><span id="notification-count">0</span>
+      </div>
+     </div>
+    </div>
+   </header><!-- Navigation Tabs -->
+   <nav id="nav-tabs" class="glass-card border-b border-slate-700 px-4 sticky top-16 z-40 overflow-x-auto">
+    <div class="max-w-2xl mx-auto flex items-center gap-1"><button onclick="switchTab('home')" class="tab-button active py-3 px-4 text-sm font-medium text-slate-400 hover:text-white transition-colors" data-tab="home"> <span>🏠 หน้าแรก</span> </button> <button onclick="switchTab('scan')" class="tab-button py-3 px-4 text-sm font-medium text-slate-400 hover:text-white transition-colors" data-tab="scan"> <span>📸 สแกน</span> </button> <button onclick="switchTab('history')" class="tab-button py-3 px-4 text-sm font-medium text-slate-400 hover:text-white transition-colors" data-tab="history"> <span>📋 ประวัติ</span> </button> <button onclick="switchTab('report')" class="tab-button py-3 px-4 text-sm font-medium text-slate-400 hover:text-white transition-colors" data-tab="report"> <span>📊 รายงาน</span> </button> <button onclick="switchTab('settings')" class="tab-button py-3 px-4 text-sm font-medium text-slate-400 hover:text-white transition-colors" data-tab="settings"> <span>⚙️ ตั้งค่า</span> </button>
+    </div>
+   </nav><!-- Main Content -->
+   <main id="main-content" class="flex-1 max-w-2xl mx-auto w-full px-4 py-6 overflow-y-auto"><!-- Content loaded here -->
+   </main>
+  </div><!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-3 rounded-lg shadow-xl hidden z-50 animate-fade-in"></div><!-- Confirmation Modal -->
+  <div id="modal" class="modal-backdrop fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+   <div class="glass-card rounded-xl p-6 max-w-sm w-full animate-fade-in">
+    <h3 id="modal-title" class="text-lg font-bold text-white mb-2"></h3>
+    <p id="modal-message" class="text-slate-300 mb-6"></p>
+    <div class="flex gap-3"><button onclick="closeModal()" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg transition-colors">ยกเลิก</button> <button id="modal-confirm" onclick="confirmAction()" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">ยืนยัน</button>
+    </div>
+   </div>
+  </div>
+  <script>
+    // ============ State Management ============
+    let appState = {
+      currentTab: 'home',
+      scanHistory: [],
+      currentScan: null,
+      isLoading: false,
+      notificationCount: 0,
+      patientName: '',
+      selectedEye: 'right'
+    };
+
+    let config = {
+      app_title: 'OcuScan AI Pro',
+      tagline: 'ระบบตรวจหาพยาธิดวงตา'
+    };
+
+    const defaultConfig = { ...config };
+
+    // ============ Data SDK Handler ============
+    const dataHandler = {
+      async onDataChanged(data) {
+        appState.scanHistory = data.sort((a, b) => new Date(b.scan_date) - new Date(a.scan_date));
+        if (appState.currentTab === 'history') {
+          renderHistoryTab();
+        }
+        updateNotificationBadge();
+      }
+    };
+
+    // ============ Initialize SDK ============
+    async function initializeSDK() {
+      if (window.dataSdk) {
+        const result = await window.dataSdk.init(dataHandler);
+        if (!result.isOk) {
+          console.error('Data SDK Init Error:', result.error);
+        }
+      }
+
+      if (window.elementSdk) {
+        window.elementSdk.init({
+          defaultConfig,
+          onConfigChange: (newConfig) => {
+            config = { ...defaultConfig, ...newConfig };
+            updateHeader();
+          },
+          mapToCapabilities: () => ({
+            recolorables: [
+              {
+                get: () => '#3b82f6',
+                set: (value) => window.elementSdk.setConfig({ primary_color: value })
+              }
+            ],
+            borderables: [],
+            fontEditable: undefined,
+            fontSizeable: undefined
+          }),
+          mapToEditPanelValues: () => new Map([
+            ['app_title', config.app_title],
+            ['tagline', config.tagline]
+          ])
+        });
+      }
+    }
+
+    // ============ Tab Switching ============
+    function switchTab(tabName) {
+      appState.currentTab = tabName;
+      document.querySelectorAll('.tab-button').forEach(btn => {
+        btn.classList.remove('active', 'nav-active');
+      });
+      document.querySelector(`[data-tab="${tabName}"]`).parentElement.classList.add('active');
+      document.querySelector(`[data-tab="${tabName}"]`).classList.add('nav-active');
+
+      const contentMap = {
+        'home': renderHomeTab,
+        'scan': renderScanTab,
+        'history': renderHistoryTab,
+        'report': renderReportTab,
+        'settings': renderSettingsTab
+      };
+
+      if (contentMap[tabName]) {
+        contentMap[tabName]();
+      }
+    }
+
+    // ============ Home Tab ============
+    function renderHomeTab() {
+      const content = document.getElementById('main-content');
+      content.innerHTML = `
+        <div class="space-y-6 animate-fade-in">
+          <!-- Dashboard Stats -->
+          <div class="grid grid-cols-2 gap-4">
+            <div class="stat-card rounded-xl p-4">
+              <div class="text-2xl font-bold text-cyan-400">${appState.scanHistory.length}</div>
+              <div class="text-xs text-slate-400 mt-1">รวมการสแกน</div>
+            </div>
+            <div class="stat-card rounded-xl p-4">
+              <div class="text-2xl font-bold text-red-400">${appState.notificationCount}</div>
+              <div class="text-xs text-slate-400 mt-1">ผลเสี่ยง</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="glass-card rounded-xl p-6 space-y-3">
+            <h2 class="text-lg font-bold text-white mb-4">ขั้นตอนโดยทั่วไป</h2>
+            <button onclick="switchTab('scan')" class="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-between shadow-lg shadow-blue-600/30 group">
+              <div class="flex items-center gap-3">
+                <div class="text-2xl">📸</div>
+                <span>เริ่มสแกนภาพใหม่</span>
+              </div>
+              <span class="text-xl group-hover:translate-x-1 transition-transform">→</span>
+            </button>
+            <button onclick="switchTab('history')" class="w-full bg-slate-700/50 hover:bg-slate-700 transition-all text-white font-medium py-3.5 px-6 rounded-xl flex items-center justify-between border border-slate-600">
+              <div class="flex items-center gap-3">
+                <div class="text-2xl">📋</div>
+                <span>ดูประวัติการสแกน</span>
+              </div>
+              <span>→</span>
+            </button>
+          </div>
+
+          <!-- Latest Results -->
+          ${appState.scanHistory.length > 0 ? `
+            <div class="glass-card rounded-xl p-4">
+              <h3 class="font-bold text-white mb-3">ผลลัพธ์ล่าสุด</h3>
+              <div class="space-y-2">
+                ${appState.scanHistory.slice(0, 3).map(scan => `
+                  <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700 hover:border-blue-500/50 transition-colors cursor-pointer" onclick="viewScanDetail('${scan.__backendId}')">
+                    <div class="flex items-center justify-between">
+                      <div>
+                        <div class="font-medium text-white">${scan.patient_name}</div>
+                        <div class="text-xs text-slate-400">${new Date(scan.scan_date).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}</div>
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-bold text-cyan-400">${scan.confidence}%</span>
+                        <span class="severity-${scan.severity.toLowerCase()}">${getSeverityLabel(scan.severity)}</span>
+                      </div>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Information Card -->
+          <div class="glass-card rounded-xl p-4 border border-amber-500/30 bg-amber-500/10">
+            <div class="flex gap-3">
+              <div class="text-2xl">⚠️</div>
+              <div>
+                <h4 class="font-semibold text-white mb-1">ข้อมูลสำคัญ</h4>
+                <p class="text-xs text-slate-300 leading-relaxed">ระบบนี้ใช้สำหรับการคัดกรองเบื้องต้นเท่านั้น การวินิจฉัยที่แน่นอนต้องทำโดยแพทย์ผู้เชี่ยวชาญเท่านั้น</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============ Scan Tab ============
+    function renderScanTab() {
+      const content = document.getElementById('main-content');
+      content.innerHTML = `
+        <div class="space-y-6 animate-fade-in">
+          <div class="text-center mb-4">
+            <h2 class="text-2xl font-bold text-white">เตรียมการสแกน</h2>
+            <p class="text-slate-400 text-sm mt-1">กรอกข้อมูลผู้ป่วยและเลือกดวงตา</p>
+          </div>
+
+          <!-- Patient Form -->
+          <div class="glass-card rounded-xl p-4 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">ชื่อผู้ป่วย</label>
+              <input type="text" id="patient-name" placeholder="กรอกชื่อผู้ป่วย" 
+                class="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500 transition-colors"
+                value="${appState.patientName}" 
+                oninput="appState.patientName = this.value">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">เลือกดวงตา</label>
+              <div class="flex gap-3">
+                <button onclick="appState.selectedEye = 'right'; renderScanTab()" 
+                  class="flex-1 py-3 px-4 rounded-lg font-medium transition-all ${appState.selectedEye === 'right' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">
+                  👁️ ตาขวา
+                </button>
+                <button onclick="appState.selectedEye = 'left'; renderScanTab()" 
+                  class="flex-1 py-3 px-4 rounded-lg font-medium transition-all ${appState.selectedEye === 'left' ? 'bg-blue-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}">
+                  👁️ ตาซ้าย
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Upload Options -->
+          <div class="glass-card rounded-xl p-4 space-y-3">
+            <h3 class="font-bold text-white mb-3">อัปโหลดภาพ</h3>
+            <label class="block">
+              <input type="file" accept="image/*" id="camera-input" class="hidden" onchange="handleImageUpload(event)">
+              <div class="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all cursor-pointer text-white font-semibold py-4 px-6 rounded-xl flex items-center justify-center gap-3 shadow-lg shadow-blue-600/30">
+                📷 ถ่ายภาพ
+              </div>
+            </label>
+            
+            <label class="block">
+              <input type="file" accept="image/*" id="upload-input" class="hidden" onchange="handleImageUpload(event)">
+              <div class="bg-slate-700 hover:bg-slate-600 transition-all cursor-pointer text-white font-medium py-4 px-6 rounded-xl flex items-center justify-center gap-3 border border-slate-600">
+                📁 เลือกจากแฟ้ม
+              </div>
+            </label>
+          </div>
+
+          <!-- Tips -->
+          <div class="glass-card rounded-xl p-4">
+            <h4 class="font-semibold text-white mb-3">💡 เคล็ดลับการถ่ายภาพ</h4>
+            <ul class="space-y-2 text-sm text-slate-300">
+              <li class="flex items-center gap-2">
+                <span class="text-cyan-400">✓</span> แสงสว่างเพียงพอและสม่ำเสมอ
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-cyan-400">✓</span> ระยะห่างประมาณ 10-15 เซนติเมตร
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-cyan-400">✓</span> มองตรงไปด้านหน้า
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="text-cyan-400">✓</span> เปลือกตาเปิดกว้าง ไม่เบลอ
+              </li>
+            </ul>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============ History Tab ============
+    function renderHistoryTab() {
+      const content = document.getElementById('main-content');
+      
+      if (appState.scanHistory.length === 0) {
+        content.innerHTML = `
+          <div class="space-y-6 animate-fade-in py-12">
+            <div class="text-center">
+              <div class="text-6xl mb-4 opacity-30">📋</div>
+              <h3 class="text-lg font-bold text-white mb-1">ไม่พบประวัติการสแกน</h3>
+              <p class="text-slate-400 mb-6">เริ่มสแกนภาพแรกของคุณ</p>
+              <button onclick="switchTab('scan')" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors">
+                เริ่มการสแกน
+              </button>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      content.innerHTML = `
+        <div class="space-y-4 animate-fade-in">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-bold text-white">ประวัติการสแกน</h2>
+            <span class="text-sm text-slate-400">${appState.scanHistory.length} รายการ</span>
+          </div>
+
+          ${appState.scanHistory.map((scan, idx) => `
+            <div class="glass-card rounded-xl p-4 border border-slate-700 hover:border-blue-500/50 transition-all cursor-pointer hover:bg-slate-800/50" onclick="viewScanDetail('${scan.__backendId}')">
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <h3 class="font-semibold text-white">${scan.patient_name}</h3>
+                    <span class="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">${scan.eye_side === 'right' ? 'ตาขวา' : 'ตาซ้าย'}</span>
+                  </div>
+                  <p class="text-xs text-slate-400">${new Date(scan.scan_date).toLocaleString('th-TH')}</p>
+                  <p class="text-sm text-slate-300 mt-2">${scan.result_type}</p>
+                </div>
+                <div class="text-right">
+                  <div class="text-lg font-bold text-cyan-400">${scan.confidence}%</div>
+                  <div class="severity-${scan.severity.toLowerCase()} font-semibold text-sm">${getSeverityLabel(scan.severity)}</div>
+                </div>
+              </div>
+              ${scan.notes ? `<p class="text-xs text-slate-400 mt-2">📝 ${scan.notes}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // ============ Report Tab ============
+    function renderReportTab() {
+      const content = document.getElementById('main-content');
+      
+      const highRiskCount = appState.scanHistory.filter(s => s.severity === 'High').length;
+      const mediumRiskCount = appState.scanHistory.filter(s => s.severity === 'Medium').length;
+      const lowRiskCount = appState.scanHistory.filter(s => s.severity === 'Low').length;
+      const avgConfidence = appState.scanHistory.length > 0 
+        ? (appState.scanHistory.reduce((sum, s) => sum + s.confidence, 0) / appState.scanHistory.length).toFixed(1)
+        : 0;
+
+      content.innerHTML = `
+        <div class="space-y-6 animate-fade-in">
+          <h2 class="text-xl font-bold text-white">รายงานผลวิเคราะห์</h2>
+
+          <!-- Overall Statistics -->
+          <div class="grid grid-cols-2 gap-3">
+            <div class="stat-card rounded-xl p-4 border-l-4 border-red-500">
+              <div class="text-2xl font-bold text-red-400">${highRiskCount}</div>
+              <div class="text-xs text-slate-400 mt-1">กรณีสูง</div>
+            </div>
+            <div class="stat-card rounded-xl p-4 border-l-4 border-amber-500">
+              <div class="text-2xl font-bold text-amber-400">${mediumRiskCount}</div>
+              <div class="text-xs text-slate-400 mt-1">กรณีปานกลาง</div>
+            </div>
+            <div class="stat-card rounded-xl p-4 border-l-4 border-green-500">
+              <div class="text-2xl font-bold text-green-400">${lowRiskCount}</div>
+              <div class="text-xs text-slate-400 mt-1">กรณีต่ำ</div>
+            </div>
+            <div class="stat-card rounded-xl p-4 border-l-4 border-cyan-500">
+              <div class="text-2xl font-bold text-cyan-400">${avgConfidence}%</div>
+              <div class="text-xs text-slate-400 mt-1">ความแม่นยำเฉลี่ย</div>
+            </div>
+          </div>
+
+          <!-- Statistics Chart -->
+          <div class="glass-card rounded-xl p-6">
+            <h3 class="font-bold text-white mb-4">การกระจายความเสี่ยง</h3>
+            <div class="space-y-4">
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm text-slate-300">สูง (High)</span>
+                  <span class="text-sm font-bold text-red-400">${highRiskCount}</span>
+                </div>
+                <div class="h-3 bg-slate-700 rounded-full overflow-hidden">
+                  <div class="h-full bg-red-500 rounded-full" style="width: ${appState.scanHistory.length > 0 ? (highRiskCount / appState.scanHistory.length * 100) : 0}%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm text-slate-300">ปานกลาง (Medium)</span>
+                  <span class="text-sm font-bold text-amber-400">${mediumRiskCount}</span>
+                </div>
+                <div class="h-3 bg-slate-700 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500 rounded-full" style="width: ${appState.scanHistory.length > 0 ? (mediumRiskCount / appState.scanHistory.length * 100) : 0}%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-sm text-slate-300">ต่ำ (Low)</span>
+                  <span class="text-sm font-bold text-green-400">${lowRiskCount}</span>
+                </div>
+                <div class="h-3 bg-slate-700 rounded-full overflow-hidden">
+                  <div class="h-full bg-green-500 rounded-full" style="width: ${appState.scanHistory.length > 0 ? (lowRiskCount / appState.scanHistory.length * 100) : 0}%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary -->
+          <div class="glass-card rounded-xl p-4 border border-cyan-500/30">
+            <h3 class="font-bold text-white mb-3">📊 สรุปภาพรวม</h3>
+            <div class="space-y-2 text-sm text-slate-300">
+              <p>รวมการสแกนทั้งสิ้น: <span class="text-cyan-400 font-bold">${appState.scanHistory.length}</span> ครั้ง</p>
+              <p>กรณีเสี่ยง: <span class="text-red-400 font-bold">${highRiskCount}</span> รายการ</p>
+              <p>ความแม่นยำเฉลี่ย: <span class="text-cyan-400 font-bold">${avgConfidence}%</span></p>
+            </div>
+          </div>
+
+          <button onclick="exportReport()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+            📥 ส่งออกรายงาน
+          </button>
+        </div>
+      `;
+    }
+
+    // ============ Settings Tab ============
+    function renderSettingsTab() {
+      const content = document.getElementById('main-content');
+      content.innerHTML = `
+        <div class="space-y-6 animate-fade-in">
+          <h2 class="text-xl font-bold text-white">ตั้งค่า</h2>
+
+          <div class="glass-card rounded-xl p-4 space-y-4">
+            <h3 class="font-semibold text-white">ความเสี่ยง</h3>
+            <label class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+              <span class="text-slate-300">แจ้งเตือนกรณีสูง</span>
+              <input type="checkbox" checked onchange="updateSetting('notifyHighRisk', this.checked)" class="w-5 h-5 cursor-pointer">
+            </label>
+            <label class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+              <span class="text-slate-300">แจ้งเตือนกรณีปานกลาง</span>
+              <input type="checkbox" onchange="updateSetting('notifyMediumRisk', this.checked)" class="w-5 h-5 cursor-pointer">
+            </label>
+          </div>
+
+          <div class="glass-card rounded-xl p-4 space-y-4">
+            <h3 class="font-semibold text-white">การแสดงผล</h3>
+            <label class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg cursor-pointer hover:bg-slate-800 transition-colors">
+              <span class="text-slate-300">โหมดหนึ่ง</span>
+              <input type="checkbox" checked onchange="updateSetting('darkMode', this.checked)" class="w-5 h-5 cursor-pointer">
+            </label>
+          </div>
+
+          <div class="glass-card rounded-xl p-4 space-y-4">
+            <h3 class="font-semibold text-white">ข้อมูล</h3>
+            <button onclick="showModal('ยืนยันการลบ', 'คุณต้องการลบประวัติการสแกนทั้งหมดหรือไม่?', 'deleteAllHistory')" class="w-full bg-red-600/20 hover:bg-red-600/30 text-red-400 font-medium py-2 px-4 rounded-lg transition-colors border border-red-500/30">
+              🗑️ ลบประวัติทั้งหมด
+            </button>
+            <button onclick="showModal('ส่งออกข้อมูล', 'ส่งออกข้อมูลการสแกนทั้งหมดในรูปแบบ JSON?', 'exportData')" class="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 font-medium py-2 px-4 rounded-lg transition-colors border border-blue-500/30">
+              📤 ส่งออกข้อมูล
+            </button>
+          </div>
+
+          <div class="glass-card rounded-xl p-4 border border-slate-700 text-xs text-slate-400 space-y-1">
+            <p>📱 เวอร์ชัน: 1.0.0</p>
+            <p>🔐 ความปลอดภัย: ข้อมูลเข้ารหัส</p>
+            <p>📍 ตำแหน่ง: ท้องถิ่น</p>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============ Helper Functions ============
+    function handleImageUpload(event) {
+      const file = event.target.files[0];
+      if (file && appState.patientName.trim()) {
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          showProcessingScreen(reader.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        showToast(!appState.patientName ? 'กรุณากรอกชื่อผู้ป่วย' : 'เลือกไฟล์ภาพ');
+      }
+    }
+
+    async function showProcessingScreen(imageData) {
+      const content = document.getElementById('main-content');
+      let progress = 0;
+
+      content.innerHTML = `
+        <div class="space-y-6 py-8 animate-fade-in">
+          <h2 class="text-xl font-bold text-white text-center">กำลังวิเคราะห์ภาพ...</h2>
+          <div class="relative rounded-2xl overflow-hidden bg-slate-800 h-60">
+            <img src="${imageData}" class="w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-b from-transparent via-blue-500/20 to-transparent scan-animation"></div>
+          </div>
+          <div class="glass-card p-4 rounded-xl">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-slate-400">ความคืบหน้า</span>
+              <span id="progress-text" class="text-sm font-bold text-blue-400">0%</span>
+            </div>
+            <div class="h-3 bg-slate-700 rounded-full overflow-hidden">
+              <div id="progress-bar" class="h-full progress-bar rounded-full" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Simulate scanning
+      const interval = setInterval(() => {
+        progress += Math.random() * 30;
+        if (progress > 100) progress = 100;
+
+        const progressBar = document.getElementById('progress-bar');
+        const progressText = document.getElementById('progress-text');
+        if (progressBar) progressBar.style.width = `${progress}%`;
+        if (progressText) progressText.textContent = `${Math.floor(progress)}%`;
+
+        if (progress >= 100) {
+          clearInterval(interval);
+          completeAnalysis(imageData);
+        }
+      }, 400);
+    }
+
+    async function completeAnalysis(imageData) {
+      const mockResults = [
+        { type: 'Gnathostoma spinigerum', thai: 'พยาธิตัวจี๊ด', confidence: 96 },
+        { type: 'Acanthamoeba', thai: 'อะแคนธาโมบา', confidence: 87 },
+        { type: 'Toxoplasma', thai: 'พยาธิท็อกโซพลาสมา', confidence: 78 },
+        { type: 'Normal', thai: 'ปกติ', confidence: 95 }
+      ];
+
+      const result = mockResults[Math.floor(Math.random() * mockResults.length)];
+      const severities = ['Low', 'Medium', 'High'];
+      const severity = result.type === 'Normal' ? 'Low' : severities[Math.floor(Math.random() * severities.length)];
+
+      const scanData = {
+        patient_name: appState.patientName,
+        eye_side: appState.selectedEye,
+        scan_date: new Date().toISOString(),
+        result_type: result.type,
+        confidence: result.confidence,
+        severity: severity,
+        notes: `${result.thai} ที่ตรวจพบ`
+      };
+
+      if (window.dataSdk) {
+        const result = await window.dataSdk.create(scanData);
+        if (result.isOk) {
+          showResultScreen(scanData);
+        } else {
+          showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+        }
+      } else {
+        showResultScreen(scanData);
+      }
+    }
+
+    function showResultScreen(result) {
+      const content = document.getElementById('main-content');
+      const severityClass = result.severity.toLowerCase();
+      const severityLabel = getSeverityLabel(result.severity);
+
+      content.innerHTML = `
+        <div class="space-y-6 py-4 animate-slide-in">
+          <div class="text-center">
+            <div class="inline-flex items-center gap-2 mb-3 px-4 py-2 rounded-full text-sm font-medium" style="background: ${getSeverityColor(result.severity)}/20; color: ${getSeverityColor(result.severity)};">
+              ⚠️ ผลการวิเคราะห์
+            </div>
+            <h2 class="text-2xl font-bold text-white">${result.result_type}</h2>
+          </div>
+
+          <div class="glass-card rounded-xl p-6 space-y-4">
+            <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+              <span class="text-slate-400">ผู้ป่วย</span>
+              <span class="text-white font-medium">${result.patient_name}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+              <span class="text-slate-400">ดวงตา</span>
+              <span class="text-white font-medium">${result.eye_side === 'right' ? 'ตาขวา' : 'ตาซ้าย'}</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+              <span class="text-slate-400">ความแม่นยำ</span>
+              <span class="text-cyan-400 font-bold">${result.confidence}%</span>
+            </div>
+            <div class="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+              <span class="text-slate-400">ระดับความเสี่ยง</span>
+              <span class="severity-${severityClass} font-bold">${severityLabel}</span>
+            </div>
+          </div>
+
+          <div class="glass-card rounded-xl p-4 border border-amber-500/30 bg-amber-500/10">
+            <p class="text-sm text-slate-300">⚠️ ${result.notes}</p>
+          </div>
+
+          <div class="flex gap-3">
+            <button onclick="switchTab('history')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+              ดูประวัติ
+            </button>
+            <button onclick="switchTab('scan')" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 px-4 rounded-lg transition-colors">
+              สแกนใหม่
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function getSeverityLabel(severity) {
+      const labels = {
+        'High': '🔴 รุนแรง',
+        'Medium': '🟡 ปานกลาง',
+        'Low': '🟢 ต่ำ'
+      };
+      return labels[severity] || severity;
+    }
+
+    function getSeverityColor(severity) {
+      const colors = {
+        'High': '#ef4444',
+        'Medium': '#f59e0b',
+        'Low': '#10b981'
+      };
+      return colors[severity] || '#3b82f6';
+    }
+
+    function updateNotificationBadge() {
+      appState.notificationCount = appState.scanHistory.filter(s => s.severity === 'High').length;
+      const badge = document.getElementById('notification-badge');
+      if (badge) {
+        if (appState.notificationCount > 0) {
+          badge.classList.remove('hidden');
+          document.getElementById('notification-count').textContent = appState.notificationCount;
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+    }
+
+    function updateHeader() {
+      const titleEl = document.getElementById('app-title');
+      const subtitleEl = document.getElementById('app-subtitle');
+      if (titleEl) titleEl.innerHTML = `${config.app_title.split(' ')[0]} <span class="text-cyan-400">${config.app_title.split(' ')[1]}</span> ${config.app_title.split(' ')[2] || ''}`;
+      if (subtitleEl) subtitleEl.textContent = config.tagline;
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 3000);
+    }
+
+    function showModal(title, message, action) {
+      const modal = document.getElementById('modal');
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-message').textContent = message;
+      document.getElementById('modal-confirm').dataset.action = action;
+      modal.classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+    }
+
+    async function confirmAction() {
+      const action = document.getElementById('modal-confirm').dataset.action;
+      closeModal();
+
+      if (action === 'deleteAllHistory' && window.dataSdk) {
+        for (const scan of appState.scanHistory) {
+          await window.dataSdk.delete(scan);
+        }
+        showToast('ลบประวัติเรียบร้อย');
+      } else if (action === 'exportData') {
+        const json = JSON.stringify(appState.scanHistory, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'ocuscan-data.json';
+        a.click();
+        showToast('ส่งออกข้อมูลเรียบร้อย');
+      }
+    }
+
+    function exportReport() {
+      const report = `OcuScan AI Pro - รายงาน\n${new Date().toLocaleString('th-TH')}\n\nรวม: ${appState.scanHistory.length}\nสูง: ${appState.scanHistory.filter(s => s.severity === 'High').length}\nปานกลาง: ${appState.scanHistory.filter(s => s.severity === 'Medium').length}\nต่ำ: ${appState.scanHistory.filter(s => s.severity === 'Low').length}`;
+      const blob = new Blob([report], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'report.txt';
+      a.click();
+      showToast('ส่งออกรายงาน');
+    }
+
+    function updateSetting(key, value) {
+      localStorage.setItem(key, value);
+    }
+
+    function viewScanDetail(scanId) {
+      const scan = appState.scanHistory.find(s => s.__backendId === scanId);
+      if (scan) {
+        const content = document.getElementById('main-content');
+        content.innerHTML = `
+          <div class="space-y-6 animate-fade-in">
+            <button onclick="switchTab('history')" class="text-blue-400 hover:text-blue-300 font-medium flex items-center gap-1">← ย้อนกลับ</button>
+            
+            <div class="glass-card rounded-xl p-6 space-y-4">
+              <h2 class="text-2xl font-bold text-white">${scan.result_type}</h2>
+              
+              <div class="space-y-3">
+                <div class="p-3 bg-slate-800/50 rounded-lg">
+                  <div class="text-xs text-slate-400">ผู้ป่วย</div>
+                  <div class="text-white font-medium mt-1">${scan.patient_name}</div>
+                </div>
+                <div class="p-3 bg-slate-800/50 rounded-lg">
+                  <div class="text-xs text-slate-400">วันที่สแกน</div>
+                  <div class="text-white font-medium mt-1">${new Date(scan.scan_date).toLocaleString('th-TH')}</div>
+                </div>
+                <div class="p-3 bg-slate-800/50 rounded-lg">
+                  <div class="text-xs text-slate-400">ความแม่นยำ</div>
+                  <div class="text-cyan-400 font-bold mt-1">${scan.confidence}%</div>
+                </div>
+                <div class="p-3 bg-slate-800/50 rounded-lg">
+                  <div class="text-xs text-slate-400">ระดับความเสี่ยง</div>
+                  <div class="severity-${scan.severity.toLowerCase()} font-bold mt-1">${getSeverityLabel(scan.severity)}</div>
+                </div>
+                <div class="p-3 bg-slate-800/50 rounded-lg">
+                  <div class="text-xs text-slate-400">หมายเหตุ</div>
+                  <div class="text-slate-300 mt-1">${scan.notes}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // Initialize App
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeSDK();
+      renderHomeTab();
+    });
+
+    // Set up first tab as active
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelector('[data-tab="home"]').parentElement.classList.add('active');
+      document.querySelector('[data-tab="home"]').classList.add('nav-active');
+    });
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cc250b99336731c',t:'MTc3MDc5Njg1NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
